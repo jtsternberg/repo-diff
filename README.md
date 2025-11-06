@@ -2,6 +2,30 @@
 
 Scripts to compare two Git repositories and identify all differences.
 
+## Quick Setup (One-Liner)
+
+Set up everything with a single command:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/jtsternberg/repo-diff/master/bootstrap.sh | \
+    bash -s -- \
+    <source-repo-url> \
+    <destination-repo-url>
+```
+
+This will:
+1. Clone the `repo-diff` repository
+2. Clone the source repository into `repo-diff/source/`
+3. Clone the destination repository into `repo-diff/destination/`
+
+Example:
+```bash
+curl -sSL https://raw.githubusercontent.com/jtsternberg/repo-diff/master/bootstrap.sh | \
+    bash -s -- \
+    git@github.com:user/source-repo.git \
+    git@github.com:user/dest-repo.git
+```
+
 ## Setup
 
 Before using these scripts, you need to clone the source and destination repositories:
