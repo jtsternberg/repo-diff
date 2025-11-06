@@ -1,0 +1,12 @@
+.claude/settings.local.json
+
+source/
+destination/
+
+by-directory/*
+!by-directory/.gitkeep
+diff-summary.md
+file-differences.txt
+modified-files-list.txt
+depth-0-files.txt
+directories-with-changes.txt
