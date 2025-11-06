@@ -10,9 +10,10 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 show_usage() {
-    echo "Usage: $0 <source-dir> <dest-dir>"
+    echo "Usage: $0 [--yes] <source-dir> <dest-dir>"
     echo ""
     echo "Arguments:"
+    echo "  --yes       Skip confirmation prompts (auto-confirm all migrations)"
     echo "  source-dir  Source directory"
     echo "  dest-dir    Destination directory"
     echo ""
@@ -23,6 +24,9 @@ show_usage() {
     echo "  # Copy all files from all directory lists from destination to source"
     echo "  $0 destination source"
     echo ""
+    echo "  # Auto-confirm all migrations without prompts"
+    echo "  $0 --yes source destination"
+    echo ""
     echo "This script processes:"
     echo "  - depth-0-files.txt (root level files)"
     echo "  - by-directory/*-files.txt (all directory file lists)"
@@ -32,6 +36,13 @@ show_usage() {
 # Check arguments
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
     show_usage
+fi
+
+# Check for --yes flag
+YES_FLAG=""
+if [[ "$1" == "--yes" ]]; then
+    YES_FLAG="--yes"
+    shift
 fi
 
 SOURCE_DIR="${1:-source}"
@@ -58,7 +69,7 @@ fi
 
 # Process depth-0 files (root level files)
 if [ -f "$SCRIPT_DIR/depth-0-files.txt" ]; then
-    bash "$SCRIPT_DIR/migrate-files.sh" "$SCRIPT_DIR/depth-0-files.txt" "$SOURCE_DIR" "$DEST_DIR"
+    bash "$SCRIPT_DIR/migrate-files.sh" "$SCRIPT_DIR/depth-0-files.txt" "$SOURCE_DIR" "$DEST_DIR" "$YES_FLAG"
 fi
 
 # Process all directory file lists
@@ -70,6 +81,6 @@ shopt -u dotglob
 
 if [ ${#directoryfiles[@]} -gt 0 ]; then
     for directoryfile in "${directoryfiles[@]}"; do
-        bash "$SCRIPT_DIR/migrate-files.sh" "$SCRIPT_DIR/by-directory/$directoryfile" "$SOURCE_DIR" "$DEST_DIR"
+        bash "$SCRIPT_DIR/migrate-files.sh" "$SCRIPT_DIR/by-directory/$directoryfile" "$SOURCE_DIR" "$DEST_DIR" "$YES_FLAG"
     done
 fi

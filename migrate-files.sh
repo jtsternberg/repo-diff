@@ -10,12 +10,13 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 show_usage() {
-    echo "Usage: $0 <file-list> <source-dir> <dest-dir>"
+    echo "Usage: $0 <file-list> <source-dir> <dest-dir> [--yes]"
     echo ""
     echo "Arguments:"
     echo "  file-list   Path to file containing list of files to migrate (one per line)"
     echo "  source-dir  Source directory"
     echo "  dest-dir    Destination directory"
+    echo "  --yes       Skip confirmation prompt (auto-confirm)"
     echo ""
     echo "Examples:"
     echo "  # Copy all depth-0 files from source to destination"
@@ -24,8 +25,8 @@ show_usage() {
     echo "  # Copy all CLI files from destination to source"
     echo "  $0 by-directory/cli-files.txt destination source"
     echo ""
-    echo "  # Copy specific files from a custom list"
-    echo "  $0 my-files.txt source destination"
+    echo "  # Copy specific files from a custom list (auto-confirm)"
+    echo "  $0 my-files.txt source destination --yes"
     echo ""
     echo "Available file lists:"
     echo "  - depth-0-files.txt"
@@ -41,6 +42,7 @@ fi
 FILE_LIST="$1"
 SOURCE_DIR="${2:-source}"
 DEST_DIR="${3:-destination}"
+YES_FLAG="$4"
 
 # Validate file list exists
 if [ ! -f "$FILE_LIST" ]; then
@@ -79,12 +81,14 @@ echo "Destination: $DEST_DIR"
 echo "Total files: $TOTAL_FILES"
 echo ""
 
-# Ask for confirmation
-read -p "Proceed with migration? [y/N] " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Migration cancelled."
-    exit 0
+# Ask for confirmation (unless --yes flag is set)
+if [[ "$YES_FLAG" != "--yes" ]]; then
+    read -p "Proceed with migration? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Migration cancelled."
+        exit 0
+    fi
 fi
 
 # Counters
