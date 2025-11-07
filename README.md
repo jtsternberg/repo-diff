@@ -189,6 +189,13 @@ cd repo-diff
 ./run-all.sh  # Regenerate all reports
 ```
 
+## Future Development
+
+See [ROADMAP.md](ROADMAP.md) for planned features and enhancements, including:
+- Intelligent commit cherry-picking to identify and apply source commits
+- Enhanced diff visualization
+- Merge strategy recommendations
+
 ## Notes
 
 - All scripts use absolute paths and can be run from any directory
