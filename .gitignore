@@ -10,3 +10,5 @@ file-differences.txt
 modified-files-list.txt
 depth-0-files.txt
 directories-with-changes.txt
+additions-list.txt
+removals-list.txt
