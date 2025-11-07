@@ -28,7 +28,9 @@ git clone <destination-repo-url> destination
 
 # Individual steps
 ./1-generate-diff.sh           # Generate raw diff output
-./2-extract-modified-files.sh  # Extract list of modified files
+./2-extract-modified-files.sh  # Extract modified files (differ)
+./2b-extract-additions.sh      # Extract additions (only in source)
+./2c-extract-removals.sh       # Extract removals (only in destination)
 ./3-generate-summary.sh        # Generate markdown summary
 ./4-generate-directory-reports.sh  # Generate per-directory reports
 ```
@@ -49,15 +51,23 @@ cat directories-with-changes.txt
 ### Migrate Files
 
 ```bash
+# Migrate everything (modified files + additions) - DEFAULT BEHAVIOR
+./migrate-all.sh source destination
+
+# Migrate everything AND delete files only in destination
+./migrate-all.sh --removals source destination
+
+# Auto-confirm without prompts
+./migrate-all.sh --yes source destination
+./migrate-all.sh --yes --removals source destination
+
+# Migrate specific operations individually
+./migrate-files.sh modified-files-list.txt source destination [--yes]
+./migrate-additions.sh [--yes]
+./migrate-removals.sh [--yes]
+
 # Migrate specific file list
 ./migrate-files.sh <file-list> <source-dir> <dest-dir> [--yes]
-
-# Examples:
-./migrate-files.sh depth-0-files.txt source destination
-./migrate-files.sh by-directory/cli-files.txt destination source
-
-# Migrate all files from all directory lists
-./migrate-all.sh [--yes] <source-dir> <dest-dir>
 ```
 
 ## Repository Structure
@@ -69,7 +79,9 @@ repo-diff/
 ├── by-directory/        # Per-directory file lists
 ├── Generated reports:
 │   ├── file-differences.txt         # Raw diff output
-│   ├── modified-files-list.txt      # Modified files only
+│   ├── modified-files-list.txt      # Files that differ
+│   ├── additions-list.txt           # Files only in source
+│   ├── removals-list.txt            # Files only in destination
 │   ├── diff-summary.md              # Markdown summary
 │   ├── depth-0-files.txt            # Root level files
 │   └── directories-with-changes.txt # Directories with changes
@@ -77,10 +89,14 @@ repo-diff/
     ├── run-all.sh                   # Master script
     ├── 1-generate-diff.sh           # Step 1: Generate diff
     ├── 2-extract-modified-files.sh  # Step 2: Extract modified files
+    ├── 2b-extract-additions.sh      # Step 2b: Extract additions
+    ├── 2c-extract-removals.sh       # Step 2c: Extract removals
     ├── 3-generate-summary.sh        # Step 3: Generate summary
     ├── 4-generate-directory-reports.sh  # Step 4: Directory reports
     ├── migrate-files.sh             # Migrate specific files
-    ├── migrate-all.sh               # Migrate all files
+    ├── migrate-additions.sh         # Migrate additions only
+    ├── migrate-removals.sh          # Delete removals only
+    ├── migrate-all.sh               # Migrate everything (modified + additions by default)
     ├── review-depth-0.sh            # Review root files
     └── review-directory.sh          # Review directory
 ```
@@ -113,7 +129,9 @@ cd .. && ./run-all.sh  # Regenerate reports
 ## Output Files
 
 - **file-differences.txt**: Raw output from `diff -rq` showing all differences
-- **modified-files-list.txt**: Clean list of files that exist in both repos but differ
+- **modified-files-list.txt**: Files that exist in both repos but differ in content
+- **additions-list.txt**: Files that only exist in source (ready to add to destination)
+- **removals-list.txt**: Files that only exist in destination (potentially remove from destination)
 - **diff-summary.md**: Statistics and categorized file lists (modified, added, removed)
 - **depth-0-files.txt**: Root level files only
 - **directories-with-changes.txt**: Top-level directories with modifications
