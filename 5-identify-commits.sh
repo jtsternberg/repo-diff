@@ -23,6 +23,10 @@ fi
 INPUT_FILE="$SCRIPT_DIR/modified-files-list.txt"
 OUTPUT_FILE="$SCRIPT_DIR/commits-database.json"
 
+# Create temp directory
+TEMP_DIR="/tmp/repo-diff"
+mkdir -p "$TEMP_DIR"
+
 # Validate directories exist
 if [ ! -d "$SOURCE_DIR" ]; then
     echo -e "${RED}Error: Source directory not found: $SOURCE_DIR${NC}"
@@ -111,14 +115,14 @@ while IFS= read -r file; do
         fi
         cd "$SOURCE_DIR"
 
-        # Get files touched by this commit
-        files_touched=$(git show --name-only --format="" "$hash" | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        # Get files touched by this commit (write to temp file to avoid arg list too long)
+        git show --name-only --format="" "$hash" | jq -R -s -c 'split("\n") | map(select(length > 0))' > "$TEMP_DIR/files_touched.tmp"
 
-        # Get parent commits
-        parents=$(git show --format="%P" --no-patch "$hash" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+        # Get parent commits (write to temp file)
+        git show --format="%P" --no-patch "$hash" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))' > "$TEMP_DIR/parents.tmp"
 
         # Check if it's a merge commit
-        parent_count=$(echo "$parents" | jq 'length')
+        parent_count=$(jq 'length' < "$TEMP_DIR/parents.tmp")
         is_merge="false"
         if [ "$parent_count" -gt 1 ]; then
             is_merge="true"
@@ -126,10 +130,8 @@ while IFS= read -r file; do
 
         # Escape JSON strings
         message_escaped=$(echo "$message" | jq -R -s '.')
-        author_escaped=$(echo "$author" | jq -R -s '.')
-        email_escaped=$(echo "$email" | jq -R -s '.')
 
-        # Build commit object
+        # Build commit object using temp files
         commit_obj=$(jq -n \
             --arg hash "$hash" \
             --arg author "$author" \
@@ -137,8 +139,8 @@ while IFS= read -r file; do
             --arg date "$date" \
             --argjson message "$message_escaped" \
             --arg exists "$exists_in_dest" \
-            --argjson files "$files_touched" \
-            --argjson parents "$parents" \
+            --slurpfile files "$TEMP_DIR/files_touched.tmp" \
+            --slurpfile parents "$TEMP_DIR/parents.tmp" \
             --arg is_merge "$is_merge" \
             '{
                 hash: $hash,
@@ -147,14 +149,15 @@ while IFS= read -r file; do
                 date: $date,
                 message: $message,
                 exists_in_dest: ($exists == "true"),
-                files_touched: $files,
+                files_touched: $files[0],
                 target_files: [],
-                parents: $parents,
+                parents: $parents[0],
                 is_merge: ($is_merge == "true")
             }')
 
-        # Add to commits_json array
-        commits_json=$(echo "$commits_json" | jq --argjson obj "$commit_obj" '. + [$obj]')
+        # Add to commits_json array (using temp file to avoid arg list too long)
+        echo "$commit_obj" > "$TEMP_DIR/commit_obj.tmp"
+        commits_json=$(echo "$commits_json" | jq --slurpfile obj "$TEMP_DIR/commit_obj.tmp" '. + $obj')
 
         # Track unique commits
         if [[ ! " ${unique_commits[@]} " =~ " ${hash} " ]]; then
@@ -166,8 +169,10 @@ while IFS= read -r file; do
 
     # Add file and its commits to database
     if [ "$commits_json" != "[]" ]; then
-        jq --arg file "$file" --argjson commits "$commits_json" \
-            '.files[$file] = $commits' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+        # Use temp file to avoid arg list too long
+        echo "$commits_json" > "$TEMP_DIR/commits_array.tmp"
+        jq --arg file "$file" --slurpfile commits "$TEMP_DIR/commits_array.tmp" \
+            '.files[$file] = $commits[0]' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
 
         commit_count=$(echo "$commits_json" | jq 'length')
         echo -e "${GREEN}found $commit_count commits${NC}"
@@ -204,21 +209,20 @@ for hash in "${unique_commits[@]}"; do
     fi
     cd "$SOURCE_DIR"
 
-    # Get files touched and parents
-    files_touched=$(git show --name-only --format="" "$hash" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-    parents=$(git show --format="%P" --no-patch "$hash" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))')
-    parent_count=$(echo "$parents" | jq 'length')
+    # Get files touched and parents (write to temp files to avoid arg list too long)
+    git show --name-only --format="" "$hash" | jq -R -s -c 'split("\n") | map(select(length > 0))' > "$TEMP_DIR/files_touched.tmp"
+    git show --format="%P" --no-patch "$hash" | tr ' ' '\n' | jq -R -s -c 'split("\n") | map(select(length > 0))' > "$TEMP_DIR/parents.tmp"
+    parent_count=$(jq 'length' < "$TEMP_DIR/parents.tmp")
     is_merge="false"
     if [ "$parent_count" -gt 1 ]; then
         is_merge="true"
     fi
 
-    # Escape JSON strings
+    # Escape JSON strings and write target_files to temp file
     message_escaped=$(echo "$message" | jq -R -s '.')
-    author_escaped=$(echo "$author" | jq -R -s '.')
-    email_escaped=$(echo "$email" | jq -R -s '.')
+    echo "$target_files" > "$TEMP_DIR/target_files.tmp"
 
-    # Build commit object
+    # Build commit object using temp files
     commit_obj=$(jq -n \
         --arg hash "$hash" \
         --arg author "$author" \
@@ -226,9 +230,9 @@ for hash in "${unique_commits[@]}"; do
         --arg date "$date" \
         --argjson message "$message_escaped" \
         --arg exists "$exists_in_dest" \
-        --argjson files "$files_touched" \
-        --argjson target_files "$target_files" \
-        --argjson parents "$parents" \
+        --slurpfile files "$TEMP_DIR/files_touched.tmp" \
+        --slurpfile target_files "$TEMP_DIR/target_files.tmp" \
+        --slurpfile parents "$TEMP_DIR/parents.tmp" \
         --arg is_merge "$is_merge" \
         '{
             hash: $hash,
@@ -237,16 +241,17 @@ for hash in "${unique_commits[@]}"; do
             date: $date,
             message: $message,
             exists_in_dest: ($exists == "true"),
-            files_touched: $files,
-            target_files: $target_files,
-            parents: $parents,
+            files_touched: $files[0],
+            target_files: $target_files[0],
+            parents: $parents[0],
             is_merge: ($is_merge == "true")
         }')
 
-    # Add to commits index
+    # Add to commits index (using temp file to avoid arg list too long)
     cd "$SCRIPT_DIR"
-    jq --arg hash "$hash" --argjson obj "$commit_obj" \
-        '.commits[$hash] = $obj' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
+    echo "$commit_obj" > "$TEMP_DIR/commit_obj.tmp"
+    jq --arg hash "$hash" --slurpfile obj "$TEMP_DIR/commit_obj.tmp" \
+        '.commits[$hash] = $obj[0]' "$OUTPUT_FILE" > "$OUTPUT_FILE.tmp" && mv "$OUTPUT_FILE.tmp" "$OUTPUT_FILE"
 done
 
 # Update statistics
@@ -273,3 +278,7 @@ echo "  Commits to cherry-pick: $commits_to_pick"
 echo "  Commits already in dest: $commits_in_dest"
 echo ""
 echo "Generated: $OUTPUT_FILE"
+echo ""
+
+# Clean up temp directory
+rm -rf "$TEMP_DIR"
